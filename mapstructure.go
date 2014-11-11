@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // DecodeHookFunc is the callback function that can be used for
@@ -529,7 +530,20 @@ func (d *Decoder) decodeSlice(name string, data interface{}, val reflect.Value) 
 }
 
 func (d *Decoder) decodeStruct(name string, data interface{}, val reflect.Value) error {
-	dataVal := reflect.Indirect(reflect.ValueOf(data))
+	//----BEGIN UGLY TIMESTAMP HACK-----//
+	//Check if we have a time string
+	//Because a lot of databases will return a timestamp as a string :-(
+	dataVal := reflect.ValueOf(data)
+	if val.Type().String() == "time.Time" && dataVal.Kind() == reflect.String{
+		theTime, err := time.Parse(time.RFC3339, dataVal.String())
+		if err != nil{
+			return fmt.Errorf("'%s' is an unparseable time string", dataVal.String())
+		}
+		val.Set(reflect.ValueOf(theTime))
+		return nil
+	}
+	//----END UGLY TIMESTAMP HACK-----//
+	dataVal = reflect.Indirect(reflect.ValueOf(data))
 	dataValKind := dataVal.Kind()
 	if dataValKind != reflect.Map {
 		return fmt.Errorf("'%s' expected a map, got '%s'", name, dataValKind)
